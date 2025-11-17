@@ -375,7 +375,8 @@ def process_images(input_folder, overwrite_original=False, callback=None):
         if callback:
             callback("文件夹里没图片，搞啥呢？")
         return 0
-    
+     # 每次都要输出进度，但 message 不是每次都有
+    message = ""
     # 处理根目录文件
     for filename in files:
         try:
@@ -502,10 +503,15 @@ def process_images(input_folder, overwrite_original=False, callback=None):
             print(f"Processed: {input_path}")
             processed_count += 1
             
-            # 调用回调函数，随机选择一条调皮日志
+            # 调用回调函数，随机选择一条日志
             if callback:
-                message = random.choice(progress_messages)
-                callback(f"{message} ({processed_count}/{total})")
+                # 每处理 5 张生成一句日志
+                if processed_count % 3 == 0 or processed_count == total:
+                    message = random.choice(progress_messages)
+                if message:
+                    callback(f"{message} ({processed_count}/{total})")
+                else:
+                    callback(f"({processed_count}/{total})")
             
         except Exception as e:
             print(f"Error processing {input_path}: {str(e)}")
