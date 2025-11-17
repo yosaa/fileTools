@@ -1,0 +1,1 @@
+pyinstaller --name DoraTools --onedir --add-data "logo.jpg;." --clean --noconsole main.py

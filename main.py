@@ -5,6 +5,10 @@ from PIL import Image, ImageTk
 import os
 import subprocess
 import logging
+import time
+import threading
+import keyboard
+import webbrowser
 
 class FlatButton(tk.Frame):
     """扁平化按钮类"""
@@ -17,7 +21,7 @@ class FlatButton(tk.Frame):
         self.bg_color = bg_color
         self.active_bg = active_bg
         self.corner_radius = corner_radius
-        
+
         # 设置固定大小
         self.configure(width=width, height=height)
         self.pack_propagate(False)
@@ -104,7 +108,8 @@ class DoraToolbox:
         self.root.title("朵拉工具箱")
         self.root.geometry("1000x600")
         self.root.resizable(False, False)
-        
+        self.touch_clicks = []       # 记录点击时间
+        self.touch_mode = False      # 是否进入摸鱼模式
         # 设置窗口图标（如果有的话）
         try:
             self.root.iconbitmap('icon.ico')
@@ -239,7 +244,7 @@ class DoraToolbox:
         card_configs = [
             {
                 "title": "一键分类产品",
-                "desc": "根据文件名中的产品名称自动分类，如：产品名称(1).jpg",
+                "desc": "根据文件名中的产品名称自动分类",
                 "color": "#E8F4FD",
                 "text_color": "#4A90E2",
                 "icon": "◉"
@@ -267,7 +272,7 @@ class DoraToolbox:
             cards_frame.grid_columnconfigure(i, weight=1)
         
         # 底部说明文字
-        desc_frame = tk.Frame(home_frame, bg="#F8F9FA", height=80)
+        desc_frame = tk.Frame(home_frame, bg="#edf4fa", height=80)
         desc_frame.pack(fill=tk.X, pady=(40, 0))
         desc_frame.pack_propagate(False)
         
@@ -275,7 +280,7 @@ class DoraToolbox:
             desc_frame,
             text="选择左侧功能开始使用 | 支持 JPG、PNG、GIF 等常见格式 | 操作简单，处理高效",
             font=("Microsoft YaHei UI", 11),
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#777777"
         )
         desc_text.pack(pady=20)
@@ -357,7 +362,7 @@ class DoraToolbox:
             width=50,
             relief=tk.FLAT,
             bd=0,
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#333333",
             insertbackground="#666666"
         )
@@ -397,7 +402,7 @@ class DoraToolbox:
         self.classify_result_var = tk.StringVar()
         self.classify_result_var.set("请选择图片文件夹")
         
-        result_frame = tk.Frame(classify_frame, bg="#F8F9FA", height=60)
+        result_frame = tk.Frame(classify_frame, bg="#edf4fa", height=60)
         result_frame.pack(fill=tk.X, pady=20)
         result_frame.pack_propagate(False)
         
@@ -405,7 +410,7 @@ class DoraToolbox:
             result_frame,
             textvariable=self.classify_result_var,
             font=("Microsoft YaHei UI", 11),
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#666666"
         )
         result_label.pack(pady=18)
@@ -448,7 +453,7 @@ class DoraToolbox:
             width=50,
             relief=tk.FLAT,
             bd=0,
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#333333",
             insertbackground="#666666"
         )
@@ -488,7 +493,7 @@ class DoraToolbox:
         self.file_classify_result_var = tk.StringVar()
         self.file_classify_result_var.set("请选择要分类的文件夹")
         
-        result_frame = tk.Frame(file_classify_frame, bg="#F8F9FA", height=60)
+        result_frame = tk.Frame(file_classify_frame, bg="#edf4fa", height=60)
         result_frame.pack(fill=tk.X, pady=20)
         result_frame.pack_propagate(False)
         
@@ -496,7 +501,7 @@ class DoraToolbox:
             result_frame,
             textvariable=self.file_classify_result_var,
             font=("Microsoft YaHei UI", 11),
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#666666"
         )
         result_label.pack(pady=18)
@@ -539,7 +544,7 @@ class DoraToolbox:
             width=50,
             relief=tk.FLAT,
             bd=0,
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#333333",
             insertbackground="#666666"
         )
@@ -579,7 +584,7 @@ class DoraToolbox:
         self.crop_result_var = tk.StringVar()
         self.crop_result_var.set("请选择图片文件夹")
         
-        result_frame = tk.Frame(crop_frame, bg="#F8F9FA", height=60)
+        result_frame = tk.Frame(crop_frame, bg="#edf4fa", height=60)
         result_frame.pack(fill=tk.X, pady=20)
         result_frame.pack_propagate(False)
         
@@ -587,7 +592,7 @@ class DoraToolbox:
             result_frame,
             textvariable=self.crop_result_var,
             font=("Microsoft YaHei UI", 11),
-            bg="#F8F9FA",
+            bg="#edf4fa",
             fg="#666666"
         )
         result_label.pack(pady=18)
@@ -606,8 +611,7 @@ class DoraToolbox:
             fg="#333333"
         )
         title_label.pack(pady=(0, 8))
-        
-        # 副标题
+
         subtitle_label = tk.Label(
             more_frame,
             text="精彩功能正在路上",
@@ -631,17 +635,30 @@ class DoraToolbox:
         )
         icon_label.pack(expand=True)
         
+        self.start_btn = FlatButton(
+            more_frame,
+            text="催更",
+            command=self.start_touchfish,
+            width=160,
+            height=44,
+            corner_radius=10,
+            bg_color="#FFD700",
+            active_bg="#5A904A",
+            fg_color="#FFFFFF",
+            font=("Microsoft YaHei UI", 12, "bold")
+        )
+        self.start_btn.pack(pady=20)
         # 说明文字
         desc_label = tk.Label(
             more_frame,
-            text="更多实用功能正在开发中...\n敬请期待！",
+            text="更多实用功能正在开发中...",
             font=("Microsoft YaHei UI", 13),
             bg="#FFFFFF",
             fg="#777777",
             justify=tk.CENTER
         )
         desc_label.pack(pady=30)
-        
+
     def browse_folder(self, path_var):
         """浏览文件夹"""
         folder_path = filedialog.askdirectory()
@@ -673,25 +690,45 @@ class DoraToolbox:
         if not folder_path:
             messagebox.showwarning("提示", "请先选择图片文件夹路径！")
             return
-            
-        self.crop_result_var.set("正在处理中...")
+
+        self.crop_result_var.set("正在载入模型，请不要到处乱点...")
         self.root.update()
-        
+
         try:
-            # 调用图片裁切脚本
-            from image_cropper import process_folder
-            result = process_folder(folder_path, overwrite_original=False)
-            # 如果result不是数字，说明处理失败
-            if not isinstance(result, int):
-                self.crop_result_var.set(f"处理失败 {result} ")
-                messagebox.showerror("错误", f"处理过程中出现错误：\n{result}")
-                return
-            self.crop_result_var.set(f"处理完成！共处理了 {result} 张图片")
-            messagebox.showinfo("完成", f"图片裁切完成！\n共处理了 {result} 张图片")
+            import threading
+            thread = threading.Thread(target=self.crop_wrapper, args=(folder_path, self.update_progress))
+            thread.start()
+            self.root.after(100, lambda: self.check_thread(thread))
         except Exception as e:
             self.crop_result_var.set("处理失败")
             messagebox.showerror("错误", f"处理过程中出现错误：\n{str(e)}")
+
+    def check_thread(self, thread):
+        """检查线程是否完成"""
+        if thread.is_alive():
+            self.root.after(100, lambda: self.check_thread(thread))
+        else:
+            thread.join()
             
+    def update_progress(self, message):
+        """更新进度显示，线程安全"""
+        self.root.after(0, lambda: self.crop_result_var.set(message))
+
+    def crop_wrapper(self, folder, callback):
+        """线程包装函数，调用 process_folder"""
+        from image_cropper import process_folder
+        result = process_folder(folder, overwrite_original=False, callback=callback)
+        self.root.after(0, lambda: self.handle_result(result))
+
+    def handle_result(self, result):
+        """处理最终结果"""
+        if not isinstance(result, int):
+            self.crop_result_var.set(f"处理失败: {result}")
+            messagebox.showerror("错误", f"处理过程中出现错误：\n{result}")
+            return
+        self.crop_result_var.set(f"处理完成！共处理了 {result} 张图片")
+        messagebox.showinfo("完成", f"图片裁切完成！\n共处理了 {result} 张图片")
+
     def start_file_classify(self):
         """开始文件分类"""
         folder_path = self.file_classify_path_var.get()
@@ -754,7 +791,31 @@ class DoraToolbox:
                         image_count += 1
                         
             return image_count
-        
+
+    def start_touchfish(self):
+        """催更按钮点击逻辑"""
+        now = time.time()
+        # 记录点击时间
+        self.touch_clicks.append(now)
+
+        # 只保留 5 秒内的点击
+        self.touch_clicks = [t for t in self.touch_clicks if now - t <= 5]
+        # 已经进入“摸鱼模式”
+        if self.touch_mode:
+            self.touch_mode = False
+            threading.Thread(target=self.open_touchfish_site).start()
+            return
+
+        if len(self.touch_clicks) >= 7:
+            self.touch_mode = True
+            return
+
+    def open_touchfish_site(self):
+        webbrowser.open("https://fakeupdate.net/win10ue/")
+        time.sleep(2)  # 等浏览器启动一下
+        keyboard.press_and_release("f11")   # 进入全屏
+        messagebox.showinfo("提示", "已成功开启摸鱼模式！按F11退出")
+
     def run(self):
         """运行应用"""
         self.root.mainloop()
